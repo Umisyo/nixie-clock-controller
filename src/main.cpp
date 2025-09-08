@@ -20,6 +20,7 @@ void setup() {
   Serial.begin(115200);
   NixiePrint.setup();
   ntp.setSyncIntervalSeconds(120);
+  NixiePrint.splashRandom(1500 /*ms*/, 4 /*周回*/, 8 /*ms*/);
 
   // 起動直後に一度同期
   if (ntp.begin()) {
