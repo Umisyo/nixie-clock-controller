@@ -1,35 +1,49 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <Wire.h>
+#include "ntp.h"
+#include "secret.h"
+#include "NixiePrint.h"
 
-// put function declarations here:
-int myFunction(int, int);
+NixiePrint NixiePrint;
 
+NTP ntp(WIFI_SSID, WIFI_PASSWORD);
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+uint32_t makeHHMMSS(const struct tm& t) {
+    uint32_t hh = t.tm_hour;  // 時
+    uint32_t mm = t.tm_min;   // 分
+    uint32_t ss = t.tm_sec;   // 秒
+    return hh * 10000 + mm * 100 + ss; // hhmmss
 }
 
-void connectToWiFi() {
-  WiFi.begin("SSID", "PASSWORD");
-  Serial.println("Connecting to WiFi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
-  Serial.println("Connected to WiFi");
-}
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(115200);
-  pinMode(12, OUTPUT);
+  NixiePrint.setup();
+  ntp.setSyncIntervalSeconds(120);
+
+  // 起動直後に一度同期
+  if (ntp.begin()) {
+    Serial.println("Initial NTP sync OK");
+  } else {
+    Serial.println("Initial NTP sync FAILED");
+  }
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  Serial.println("Hello, World!");
-  digitalWrite(12, HIGH);
-  delay(1000);
-  digitalWrite(12, LOW);
-  delay(1000);
+  // 毎ループで呼んでOK。必要なときだけWi-Fiを上げて再同期する
+  ntp.update();
+
+  // 時刻の利用例
+  static uint32_t lastPrint = 0;
+  if (millis() - lastPrint > 1000) {
+    lastPrint = millis();
+    struct tm now{};
+    if (ntp.getTime(&now)) {
+      uint32_t hhmmss = makeHHMMSS(now);
+      Serial.printf("HHMMSS: %06d\n", hhmmss);
+      NixiePrint.print(hhmmss);
+    }
+  }
+
+  delayMicroseconds(1500);
 }
